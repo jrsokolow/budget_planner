@@ -1,0 +1,33 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# OS files
+.D
