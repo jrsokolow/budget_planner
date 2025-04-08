@@ -2,27 +2,15 @@
 import os
 
 import aws_cdk as cdk
+from aws_cdk import Environment
 
 from src.budget_csv_transform_stack import BudgetCsvTransformStack
 
-
 app = cdk.App()
-BudgetCsvTransformStack(app, "BudgetCsvTransformStack",
-    # If you don't specify 'env', this stack will be environment-agnostic.
-    # Account/Region-dependent features and context lookups will not work,
-    # but a single synthesized template can be deployed anywhere.
 
-    # Uncomment the next line to specialize this stack for the AWS Account
-    # and Region that are implied by the current CLI configuration.
-
-    #env=cdk.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
-
-    # Uncomment the next line if you know exactly what Account and Region you
-    # want to deploy the stack to. */
-
-    #env=cdk.Environment(account='123456789012', region='us-east-1'),
-
-    # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-    )
+test_env = Environment(account="769729745008", region="eu-west-1")
+BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Test", stage="test", env=test_env)
+prod_env = Environment(account="769729745008", region="eu-central-1")
+BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Prod", stage="prod", env=prod_env)
 
 app.synth()
