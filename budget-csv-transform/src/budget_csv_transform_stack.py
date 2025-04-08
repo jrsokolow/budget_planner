@@ -9,6 +9,8 @@ from aws_cdk import (
     Duration,
     RemovalPolicy
 )
+from aws_cdk.aws_lambda_event_sources import S3EventSource
+from aws_cdk.aws_s3 import NotificationKeyFilter, EventType
 from constructs import Construct
 
 
@@ -87,3 +89,12 @@ class BudgetCsvTransformStack(Stack):
             actions=["rds-db:connect"],
             resources=["*"]
         ))
+
+        # 📦 Trigger Lambda on new .csv files in the bucket
+        lambda_fn.add_event_source(
+            S3EventSource(
+                bucket,
+                events=[EventType.OBJECT_CREATED],
+                filters=[NotificationKeyFilter(suffix=".csv")]
+            )
+        )
