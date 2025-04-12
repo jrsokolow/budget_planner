@@ -8,9 +8,10 @@ from src.budget_csv_transform_stack import BudgetCsvTransformStack
 
 app = cdk.App()
 
-test_env = Environment(account="XXXX", region="eu-west-1")
-BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Test", stage="test", env=test_env)
-prod_env = Environment(account="XXXX", region="eu-central-1")
-BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Prod", stage="prod", env=prod_env)
+env = Environment(account=os.environ["CDK_DEFAULT_ACCOUNT"], region=os.environ["CDK_DEFAULT_REGION"])
+
+BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Test", stage="test", env=env)
+
+BudgetCsvTransformStack(app, "BudgetCsvTransformStack-Prod", stage="prod", env=env)
 
 app.synth()
