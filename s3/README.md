@@ -49,13 +49,13 @@ python cli.py FILE_NAME --bucket BUCKET_NAME [--object-name OBJECT_NAME]
 ### ✅ Example
 
 ```bash
-python cli.py koszty.csv --bucket moje-wydatki
+python cli.py koszty.csv --bucket budget-csv-uploads-test
 ```
 
 This uploads the file koszty.csv to the bucket moje-wydatki using the default object name koszty.csv.
 
 ```
-python cli.py koszty.csv --bucket moje-wydatki --object-name uploads/2025-03/koszty.csv
+python cli.py koszty.csv --bucket budget-csv-uploads-test --object-name uploads/2025-03/koszty.csv
 ```
 
 This uploads the same file to the path uploads/2025-03/koszty.csv in the bucket.

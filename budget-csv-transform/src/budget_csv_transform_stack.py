@@ -55,10 +55,12 @@ class BudgetCsvTransformStack(Stack):
             database_name="postgres"
         )
 
-        # 🪣 IMPORT existing S3 bucket
-        bucket = s3.Bucket.from_bucket_name(
-            self, f"ExistingCsvBucket-{stage}",
-            f"budget-csv-uploads-{stage}"
+        # 🪣 CREATE new S3 bucket (instead of importing)
+        bucket = s3.Bucket(
+            self, f"CsvUploadBucket-{stage}",
+            bucket_name=f"budget-csv-uploads-{stage}",
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True
         )
 
         # 🧠 Lambda function (CSV → RDS)
