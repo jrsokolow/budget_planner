@@ -81,6 +81,12 @@ class BudgetCsvTransformStack(Stack):
             },
             vpc=vpc,
             security_groups=[rds_instance.connections.security_groups[0]],
+            layers=[
+                _lambda.LayerVersion.from_layer_version_arn(
+                    self, "Psycopg2Layer",
+                    "arn:aws:lambda:eu-central-1:769729745008:layer:psycopg2-layer:1"
+                )
+            ],
         )
 
         # ✅ Permissions
