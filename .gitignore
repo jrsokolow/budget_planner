@@ -173,6 +173,6 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-psycopg2-layer/python/
-source.xlsx
-koszty.csv
+/psycopg2-layer/python/
+/s3/source.xlsx
+/s3/koszty.csv
