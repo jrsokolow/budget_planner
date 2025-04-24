@@ -174,3 +174,5 @@ cython_debug/
 .pypirc
 
 psycopg2-layer/python/
+source.xlsx
+koszty.csv
