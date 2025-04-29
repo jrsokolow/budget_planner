@@ -48,7 +48,7 @@ class BudgetCsvTransformStack(Stack):
             multi_az=False,
             allocated_storage=20,
             max_allocated_storage=100,
-            publicly_accessible=False,
+            publicly_accessible=True,
             vpc_subnets={"subnet_type": ec2.SubnetType.PRIVATE_WITH_EGRESS},
             removal_policy=RemovalPolicy.DESTROY,
             delete_automated_backups=True,
