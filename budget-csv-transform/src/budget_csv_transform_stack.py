@@ -31,8 +31,33 @@ class BudgetCsvTransformStack(Stack):
             )
         )
 
-        # 🌐 VPC
-        vpc = ec2.Vpc(self, f"BudgetVpc-{stage}", max_azs=2)
+        # 🌐 VPC z publicznym subnetem
+        vpc = ec2.Vpc(
+            self, f"BudgetVpc-{stage}",
+            max_azs=2,
+            nat_gateways=0,
+            subnet_configuration=[
+                ec2.SubnetConfiguration(
+                    name="Public",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                    cidr_mask=24,
+                )
+            ]
+        )
+        
+        # 🔐 Security Group pozwalająca na połączenia z Twojego IP
+        my_ip = "15.220.65.31/32"
+        rds_sg = ec2.SecurityGroup(
+            self, f"RdsSecurityGroup-{stage}",
+            vpc=vpc,
+            description="Allow PostgreSQL access from my IP",
+            allow_all_outbound=True
+        )
+        rds_sg.add_ingress_rule(
+            ec2.Peer.ipv4(my_ip),
+            ec2.Port.tcp(5432),
+            "Allow PostgreSQL access from my IP"
+        )
 
         # 🗄️ RDS PostgreSQL
         rds_instance = rds.DatabaseInstance(
@@ -49,16 +74,18 @@ class BudgetCsvTransformStack(Stack):
             allocated_storage=20,
             max_allocated_storage=100,
             publicly_accessible=True,
-            vpc_subnets={"subnet_type": ec2.SubnetType.PRIVATE_WITH_EGRESS},
+            vpc_subnets={"subnet_type": ec2.SubnetType.PUBLIC},
+            security_groups=[rds_sg],
             removal_policy=RemovalPolicy.DESTROY,
             delete_automated_backups=True,
             database_name="postgres"
         )
 
         # 🪣 CREATE new S3 bucket (instead of importing)
+        bucket_name = f"budget-csv-uploads-{stage}"
         bucket = s3.Bucket(
             self, f"CsvUploadBucket-{stage}",
-            bucket_name=f"budget-csv-uploads-{stage}",
+            bucket_name=bucket_name,
             removal_policy=RemovalPolicy.DESTROY,
             auto_delete_objects=True
         )
@@ -72,6 +99,7 @@ class BudgetCsvTransformStack(Stack):
             code=_lambda.Code.from_asset("src/lambda/csv_to_rds"),
             timeout=Duration.minutes(5),
             memory_size=512,
+            allow_public_subnet=True,
             environment={
                 "BUCKET_NAME": bucket.bucket_name,
                 "SECRET_ARN": db_credentials_secret.secret_arn,
@@ -96,6 +124,11 @@ class BudgetCsvTransformStack(Stack):
         lambda_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["rds-db:connect"],
             resources=["*"]
+        ))
+        
+        lambda_fn.add_to_role_policy(iam.PolicyStatement(
+            actions=["s3:GetObject"],
+            resources=[f"arn:aws:s3:::{bucket_name}/*"]
         ))
 
         # 📦 Trigger Lambda on new .csv files in the bucket
