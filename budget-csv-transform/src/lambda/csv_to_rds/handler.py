@@ -118,8 +118,10 @@ def main(event, context):
         return
 
     try:
+        print("🔍 Fetching DB credentials from Secrets Manager...")
         secrets = boto3.client("secretsmanager")
         secret_value = secrets.get_secret_value(SecretId=secret_arn)
+        print("🔐 Secret retrieved")
         secret_dict = json.loads(secret_value["SecretString"])
         print("🔐 Retrieved DB credentials from Secrets Manager")
     except Exception as e:

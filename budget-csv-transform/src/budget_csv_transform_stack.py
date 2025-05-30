@@ -45,7 +45,20 @@ class BudgetCsvTransformStack(Stack):
             ]
         )
         
-        # 🔐 Security Group pozwalająca na połączenia z Twojego IP
+        vpc.add_interface_endpoint(
+            "SecretsManagerEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
+        )
+
+        # 🚪 Add Gateway VPC endpoint for S3
+        vpc.add_gateway_endpoint(
+            "S3Endpoint",
+            service=ec2.GatewayVpcEndpointAwsService.S3,
+            subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)]
+        )
+
+        # 🔐 Security Group pozwalająca na połączenia z Twojego IP  
         my_ip = "15.220.65.31/32"
         rds_sg = ec2.SecurityGroup(
             self, f"RdsSecurityGroup-{stage}",
@@ -115,6 +128,12 @@ class BudgetCsvTransformStack(Stack):
                     "arn:aws:lambda:eu-central-1:769729745008:layer:psycopg2-layer:1"
                 )
             ],
+        )
+        
+        rds_sg.add_ingress_rule(
+            lambda_fn.connections.security_groups[0],
+            ec2.Port.tcp(5432),
+            "Allow Lambda to access RDS"
         )
 
         # ✅ Permissions
