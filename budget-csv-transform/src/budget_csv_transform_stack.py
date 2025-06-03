@@ -19,7 +19,7 @@ class BudgetCsvTransformStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, stage="dev", **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
-        # 🔐 Secret for RDS credentials
+        # 🔐 Sekret w AWS Secrets Manager przechowujący dane logowania do RDS
         db_credentials_secret = secretsmanager.Secret(
             self, f"BudgetRdsCredentials-{stage}",
             secret_name=f"budget-rds-credentials-{stage}",
@@ -31,7 +31,7 @@ class BudgetCsvTransformStack(Stack):
             )
         )
 
-        # 🌐 VPC z publicznym subnetem
+        # 🌐 VPC z publicznymi subnetami — brak NAT Gateway
         vpc = ec2.Vpc(
             self, f"BudgetVpc-{stage}",
             max_azs=2,
@@ -44,43 +44,36 @@ class BudgetCsvTransformStack(Stack):
                 )
             ]
         )
-        
+
+        # 🔌 VPC Endpoint Interface do Secrets Manager — pozwala Lambdzie pobierać sekrety bez NAT
         vpc.add_interface_endpoint(
             "SecretsManagerEndpoint",
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
             subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
         )
 
-        # 🚪 Add Gateway VPC endpoint for S3
+        # 🚪 Gateway VPC Endpoint do S3 — umożliwia dostęp do bucketów bez potrzeby NAT
         vpc.add_gateway_endpoint(
             "S3Endpoint",
             service=ec2.GatewayVpcEndpointAwsService.S3,
             subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)]
         )
 
-        # 🔐 Security Group pozwalająca na połączenia z Twojego IP  
-        my_ip = "15.220.65.31/32"
+        # 🔐 Security Group dla bazy RDS — pozwala na dostęp z mojego IP oraz Lambdy
+        my_ip = "15.220.65.31/32"  # Twój zewnętrzny adres IP
         rds_sg = ec2.SecurityGroup(
             self, f"RdsSecurityGroup-{stage}",
             vpc=vpc,
-            description="Allow PostgreSQL access from my IP",
+            description="Allow PostgreSQL access from my IP and Lambda",
             allow_all_outbound=True
         )
-        rds_sg.add_ingress_rule(
-            ec2.Peer.ipv4(my_ip),
-            ec2.Port.tcp(5432),
-            "Allow PostgreSQL access from my IP"
-        )
+        rds_sg.add_ingress_rule(ec2.Peer.ipv4(my_ip), ec2.Port.tcp(5432), "Access from my IP")
 
         # 🗄️ RDS PostgreSQL
         rds_instance = rds.DatabaseInstance(
             self, f"BudgetPostgres-{stage}",
-            engine=rds.DatabaseInstanceEngine.postgres(
-                version=rds.PostgresEngineVersion.VER_15
-            ),
-            instance_type=ec2.InstanceType.of(
-                ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO
-            ),
+            engine=rds.DatabaseInstanceEngine.postgres(version=rds.PostgresEngineVersion.VER_15),
+            instance_type=ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO),
             vpc=vpc,
             credentials=rds.Credentials.from_secret(db_credentials_secret),
             multi_az=False,
@@ -94,7 +87,7 @@ class BudgetCsvTransformStack(Stack):
             database_name="postgres"
         )
 
-        # 🪣 CREATE new S3 bucket (instead of importing)
+        # 🪣 Bucket S3 do którego będą wrzucane pliki CSV
         bucket_name = f"budget-csv-uploads-{stage}"
         bucket = s3.Bucket(
             self, f"CsvUploadBucket-{stage}",
@@ -103,7 +96,7 @@ class BudgetCsvTransformStack(Stack):
             auto_delete_objects=True
         )
 
-        # 🧠 Lambda function (CSV → RDS)
+        # 🧠 Lambda przetwarzająca plik CSV i zapisująca dane do RDS
         lambda_fn = _lambda.Function(
             self, f"CsvToRdsLambda-{stage}",
             function_name=f"csv-to-rds-{stage}",
@@ -121,7 +114,7 @@ class BudgetCsvTransformStack(Stack):
                 "RDS_PORT": str(rds_instance.db_instance_endpoint_port),
             },
             vpc=vpc,
-            security_groups=[rds_instance.connections.security_groups[0]],
+            security_groups=[rds_sg],
             layers=[
                 _lambda.LayerVersion.from_layer_version_arn(
                     self, "Psycopg2Layer",
@@ -129,14 +122,15 @@ class BudgetCsvTransformStack(Stack):
                 )
             ],
         )
-        
+
+        # ➕ Lambda dostaje dostęp do RDS przez Security Group
         rds_sg.add_ingress_rule(
             lambda_fn.connections.security_groups[0],
             ec2.Port.tcp(5432),
             "Allow Lambda to access RDS"
         )
 
-        # ✅ Permissions
+        # ✅ Uprawnienia IAM dla Lambdy
         bucket.grant_read(lambda_fn)
         db_credentials_secret.grant_read(lambda_fn)
 
@@ -144,13 +138,13 @@ class BudgetCsvTransformStack(Stack):
             actions=["rds-db:connect"],
             resources=["*"]
         ))
-        
+
         lambda_fn.add_to_role_policy(iam.PolicyStatement(
             actions=["s3:GetObject"],
             resources=[f"arn:aws:s3:::{bucket_name}/*"]
         ))
 
-        # 📦 Trigger Lambda on new .csv files in the bucket
+        # 📦 Wyzwalacz — Lambda odpala się gdy nowy plik CSV trafia do bucketa
         lambda_fn.add_event_source(
             S3EventSource(
                 bucket,
