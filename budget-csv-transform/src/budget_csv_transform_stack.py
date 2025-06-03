@@ -19,7 +19,7 @@ class BudgetCsvTransformStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, stage="dev", **kwargs):
         super().__init__(scope, construct_id, **kwargs)
 
-        # 🔐 Sekret w AWS Secrets Manager przechowujący dane logowania do RDS
+        # 🔐 Secret in AWS Secrets Manager that stores RDS credentials
         db_credentials_secret = secretsmanager.Secret(
             self, f"BudgetRdsCredentials-{stage}",
             secret_name=f"budget-rds-credentials-{stage}",
@@ -31,7 +31,7 @@ class BudgetCsvTransformStack(Stack):
             )
         )
 
-        # 🌐 VPC z publicznymi subnetami — brak NAT Gateway
+        # 🌐 VPC with public subnets — no NAT Gateway
         vpc = ec2.Vpc(
             self, f"BudgetVpc-{stage}",
             max_azs=2,
@@ -45,22 +45,22 @@ class BudgetCsvTransformStack(Stack):
             ]
         )
 
-        # 🔌 VPC Endpoint Interface do Secrets Manager — pozwala Lambdzie pobierać sekrety bez NAT
+        # 🔌 VPC Interface Endpoint to Secrets Manager — allows Lambda to fetch secrets without NAT
         vpc.add_interface_endpoint(
             "SecretsManagerEndpoint",
             service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
             subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)
         )
 
-        # 🚪 Gateway VPC Endpoint do S3 — umożliwia dostęp do bucketów bez potrzeby NAT
+        # 🚪 Gateway VPC Endpoint for S3 — allows access to S3 buckets without NAT
         vpc.add_gateway_endpoint(
             "S3Endpoint",
             service=ec2.GatewayVpcEndpointAwsService.S3,
             subnets=[ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC)]
         )
 
-        # 🔐 Security Group dla bazy RDS — pozwala na dostęp z mojego IP oraz Lambdy
-        my_ip = "15.220.65.31/32"  # Twój zewnętrzny adres IP
+        # 🔐 Security Group for RDS — allows access from my IP and Lambda
+        my_ip = "*****"  # Your external IP address
         rds_sg = ec2.SecurityGroup(
             self, f"RdsSecurityGroup-{stage}",
             vpc=vpc,
@@ -69,7 +69,7 @@ class BudgetCsvTransformStack(Stack):
         )
         rds_sg.add_ingress_rule(ec2.Peer.ipv4(my_ip), ec2.Port.tcp(5432), "Access from my IP")
 
-        # 🗄️ RDS PostgreSQL
+        # 🗄️ RDS PostgreSQL instance
         rds_instance = rds.DatabaseInstance(
             self, f"BudgetPostgres-{stage}",
             engine=rds.DatabaseInstanceEngine.postgres(version=rds.PostgresEngineVersion.VER_15),
@@ -87,7 +87,7 @@ class BudgetCsvTransformStack(Stack):
             database_name="postgres"
         )
 
-        # 🪣 Bucket S3 do którego będą wrzucane pliki CSV
+        # 🪣 S3 bucket for uploading CSV files
         bucket_name = f"budget-csv-uploads-{stage}"
         bucket = s3.Bucket(
             self, f"CsvUploadBucket-{stage}",
@@ -96,7 +96,7 @@ class BudgetCsvTransformStack(Stack):
             auto_delete_objects=True
         )
 
-        # 🧠 Lambda przetwarzająca plik CSV i zapisująca dane do RDS
+        # 🧠 Lambda function that processes the CSV and writes to RDS
         lambda_fn = _lambda.Function(
             self, f"CsvToRdsLambda-{stage}",
             function_name=f"csv-to-rds-{stage}",
@@ -123,14 +123,14 @@ class BudgetCsvTransformStack(Stack):
             ],
         )
 
-        # ➕ Lambda dostaje dostęp do RDS przez Security Group
+        # ➕ Lambda allowed to access RDS via security group
         rds_sg.add_ingress_rule(
             lambda_fn.connections.security_groups[0],
             ec2.Port.tcp(5432),
             "Allow Lambda to access RDS"
         )
 
-        # ✅ Uprawnienia IAM dla Lambdy
+        # ✅ IAM permissions for Lambda
         bucket.grant_read(lambda_fn)
         db_credentials_secret.grant_read(lambda_fn)
 
@@ -144,7 +144,7 @@ class BudgetCsvTransformStack(Stack):
             resources=[f"arn:aws:s3:::{bucket_name}/*"]
         ))
 
-        # 📦 Wyzwalacz — Lambda odpala się gdy nowy plik CSV trafia do bucketa
+        # 📦 S3 trigger — Lambda is triggered when a new CSV file is uploaded to the bucket
         lambda_fn.add_event_source(
             S3EventSource(
                 bucket,
