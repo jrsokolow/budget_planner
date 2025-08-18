@@ -57,8 +57,12 @@ command.
 
 # Example deployment commands
 
+Before deploy set my current ip in budget_csv_transform_stack.py stored in variable my_ip
+
 * cdk deploy BudgetCsvTransformStack-Test - this will deploy in eu-central-1
 * cdk deploy BudgetCsvTransformStack-Test --profile my-profile -  this will deploy in us-east-1
+
+After creating stack in aws please remember to create transactions table using script.sql via pgAdmin 4
 
 cdk destroy BudgetCsvTransformStack-Test
 
