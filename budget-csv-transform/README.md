@@ -60,4 +60,6 @@ command.
 * cdk deploy BudgetCsvTransformStack-Test - this will deploy in eu-central-1
 * cdk deploy BudgetCsvTransformStack-Test --profile my-profile -  this will deploy in us-east-1
 
+cdk destroy BudgetCsvTransformStack-Test
+
 Enjoy!
